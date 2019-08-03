@@ -1,14 +1,12 @@
 /*
  * Configuration file for the IPP samples on Windows.
  *
- * Copyright 2007-2016 by Apple Inc.
- * Copyright 1997-2007 by Easy Software Products.
+ * Copyright © 2014-2019 by the IEEE-ISTO Printer Working Group.
+ * Copyright © 2007-2019 by Apple Inc.
+ * Copyright © 1997-2007 by Easy Software Products.
  *
- * These coded instructions, statements, and computer programs are the
- * property of Apple Inc. and are protected by Federal copyright
- * law.  Distribution and use rights are outlined in the file "LICENSE.txt"
- * which should have been included with this file.  If this file is
- * missing or damaged, see the license at "http://www.cups.org/".
+ * Licensed under Apache License v2.0.  See the file "LICENSE" for more
+ * information.
  */
 
 #ifndef _CUPS_CONFIG_H_
@@ -40,24 +38,23 @@
 #define close		_close
 #define fileno		_fileno
 #define lseek		_lseek
+#define lstat		stat
 #define mkdir(d,p)	_mkdir(d)
 #define open		_open
 #define read	        _read
 #define rmdir		_rmdir
-#define snprintf 	_snprintf
 #define strdup		_strdup
 #define unlink		_unlink
-#define vsnprintf 	_vsnprintf
 #define write		_write
 
 
 /*
- * Map the POSIX strcasecmp() and strncasecmp() functions to the Win32 stricmp()
- * and strnicmp() functions...
+ * Map the POSIX strcasecmp() and strncasecmp() functions to the Win32
+ * _stricmp() and _strnicmp() functions...
  */
 
-#define strcasecmp	stricmp
-#define strncasecmp	strnicmp
+#define strcasecmp	_stricmp
+#define strncasecmp	_strnicmp
 
 
 /*
@@ -76,10 +73,17 @@ typedef unsigned long useconds_t;
 #  define F_OK		00
 #  define W_OK		02
 #  define R_OK		04
+#  define X_OK		0
+
 #  define O_RDONLY	_O_RDONLY
 #  define O_WRONLY	_O_WRONLY
 #  define O_CREAT	_O_CREAT
 #  define O_TRUNC	_O_TRUNC
+#  define O_CLOEXEC	0
+#  define O_NOFOLLOW	0
+
+#  define S_ISDIR(m)	((m) & _S_IFDIR)
+#  define S_ISREG(m)	(!((m) & _S_IFDIR))
 
 
 /*
@@ -94,8 +98,8 @@ typedef unsigned long useconds_t;
  * Version of software...
  */
 
-#define CUPS_SVERSION "IPPSAMPLE v20160531"
-#define CUPS_MINIMAL "IPPSAMPLE/20160531"
+#define CUPS_SVERSION "IPPSAMPLE v1.0b1"
+#define CUPS_MINIMAL "IPPSAMPLE/1.0b1"
 
 
 /*
@@ -109,7 +113,7 @@ typedef unsigned long useconds_t;
  * Do we have domain socket support, and if so what is the default one?
  */
 
-#undef CUPS_DEFAULT_DOMAINSOCKET
+/* #undef CUPS_DEFAULT_DOMAINSOCKET */
 
 
 /*
@@ -119,9 +123,9 @@ typedef unsigned long useconds_t;
  *       variables at run-time...
  */
 
-#define CUPS_CACHEDIR "C:/CUPS/cache"
 #define CUPS_DATADIR "C:/CUPS/share"
 #define CUPS_LOCALEDIR "C:/CUPS/locale"
+#define CUPS_SERVERBIN "C:/CUPS/bin"
 #define CUPS_SERVERROOT "C:/CUPS/etc"
 #define CUPS_STATEDIR "C:/CUPS/run"
 
@@ -139,6 +143,16 @@ typedef unsigned long useconds_t;
 
 #define HAVE_LIBZ 1
 #define HAVE_INFLATECOPY 1
+
+
+/*
+ * Do we have PAM stuff?
+ */
+
+/* #undef HAVE_LIBPAM */
+/* #undef HAVE_SECURITY_PAM_APPL_H */
+/* #undef HAVE_PAM_PAM_APPL_H */
+/* #undef DEFAULT_PAM_SERVICE */
 
 
 /*
@@ -196,8 +210,9 @@ typedef unsigned long useconds_t;
  * Do we have the (v)snprintf() functions?
  */
 
-#define HAVE_SNPRINTF 1
-#define HAVE_VSNPRINTF 1
+/* Windows snprintf/vsnprintf are non-conforming */
+/* #def HAVE_SNPRINTF */
+/* #undef HAVE_VSNPRINTF */
 
 
 /*
@@ -251,22 +266,9 @@ typedef unsigned long useconds_t;
  * What Security framework headers do we have?
  */
 
-/* #undef HAVE_AUTHORIZATION_H */
-/* #undef HAVE_SECBASEPRIV_H */
 /* #undef HAVE_SECCERTIFICATE_H */
-/* #undef HAVE_SECIDENTITYSEARCHPRIV_H */
 /* #undef HAVE_SECITEM_H */
-/* #undef HAVE_SECITEMPRIV_H */
 /* #undef HAVE_SECPOLICY_H */
-/* #undef HAVE_SECPOLICYPRIV_H */
-/* #undef HAVE_SECURETRANSPORTPRIV_H */
-
-
-/*
- * Do we have the cssmErrorString function?
- */
-
-/* #undef HAVE_CSSMERRORSTRING */
 
 
 /*
@@ -274,20 +276,6 @@ typedef unsigned long useconds_t;
  */
 
 /* #undef HAVE_SECGENERATESELFSIGNEDCERTIFICATE */
-
-
-/*
- * Do we have the SecKeychainOpen function?
- */
-
-/* #undef HAVE_SECKEYCHAINOPEN */
-
-
-/*
- * Do we have (a working) SSLSetEnabledCiphers function?
- */
-
-#define HAVE_SSLSETENABLEDCIPHERS 1
 
 
 /*
@@ -301,7 +289,7 @@ typedef unsigned long useconds_t;
  * Do we have Avahi for DNS Service Discovery (aka Bonjour)?
  */
 
-#undef HAVE_AVAHI
+/* #undef HAVE_AVAHI */
 
 
 /*
@@ -375,19 +363,17 @@ typedef unsigned long useconds_t;
 
 
 /*
- * Do we have CoreFoundation public and private headers?
+ * Do we have CoreFoundation public headers?
  */
 
 /* #undef HAVE_COREFOUNDATION_H */
-/* #undef HAVE_CFPRIV_H */
-/* #undef HAVE_CFBUNDLEPRIV_H */
 
 
 /*
- * Do we have ApplicationServices public headers?
+ * Do we have CoreGraphics?
  */
 
-/* #undef HAVE_APPLICATIONSERVICES_H */
+/* #undef HAVE_COREGRAPHICS */
 
 
 /*
@@ -395,6 +381,9 @@ typedef unsigned long useconds_t;
  */
 
 /* #undef HAVE_MUPDF */
+/* #undef HAVE_FZ_MAKE_MATRIX */
+/* #undef HAVE_FZ_NEW_PIXMAP_5_ARG */
+/* #undef HAVE_FZ_CMM_ENGINE_LCMS */
 
 
 /*
@@ -437,7 +426,7 @@ typedef unsigned long useconds_t;
 
 #ifdef HAVE_ARC4RANDOM
 #  define CUPS_RAND() arc4random()
-#  define CUPS_SRAND(v) arc4random_stir()
+#  define CUPS_SRAND(v)
 #elif defined(HAVE_RANDOM)
 #  define CUPS_RAND() random()
 #  define CUPS_SRAND(v) srandom(v)
@@ -492,5 +481,13 @@ static __inline int _cups_abs(int i) { return (i < 0 ? -i : i); }
 #    define abs(x) ((x) < 0 ? -(x) : (x))
 #  endif /* __GNUC__ || __STDC_VERSION__ */
 #endif /* !HAVE_ABS && !abs */
+
+
+/*
+ * Do we have the Cura software?
+ */
+
+/* #undef CURAENGINE */
+
 
 #endif /* !_CUPS_CONFIG_H_ */

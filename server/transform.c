@@ -10,18 +10,21 @@
 
 #include "ippserver.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #  include <sys/timeb.h>
 #else
 #  include <signal.h>
 #  include <spawn.h>
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
 
 /*
  * Local functions...
  */
 
+#ifdef _WIN32
+static int	asprintf(char **s, const char *format, ...);
+#endif /* _WIN32 */
 static void	process_attr_message(server_job_t *job, char *message, server_transform_t mode);
 static void	process_state_message(server_job_t *job, char *message);
 static double	time_seconds(void);
@@ -42,9 +45,10 @@ serverStopJob(server_job_t *job)	/* I - Job to stop */
   job->state         = IPP_JSTATE_STOPPED;
   job->state_reasons |= SERVER_JREASON_JOB_STOPPED;
 
+#ifndef _WIN32 /* TODO: Figure out a way to kill a spawned process on Windows */
   if (job->transform_pid)
     kill(job->transform_pid, SIGTERM);
-
+#endif /* !_WIN32 */
   _cupsRWUnlock(&job->rwlock);
 
   serverAddEventNoLock(job->printer, job, NULL, SERVER_EVENT_JOB_STATE_CHANGED, "Job stopped.");
@@ -69,13 +73,13 @@ serverTransformJob(
   double	start,			/* Start time */
                 end;			/* End time */
   char		*myargv[3],		/* Command-line arguments */
-		*myenvp[200];		/* Environment variables */
+		*myenvp[400];		/* Environment variables */
   int		myenvc;			/* Number of environment variables */
   ipp_attribute_t *attr;		/* Job attribute */
   char		val[1280],		/* IPP_NAME=value */
                 *valptr,		/* Pointer into string */
                 fullcommand[1024];	/* Full command path */
-#ifndef WIN32
+#ifndef _WIN32
   posix_spawn_file_actions_t actions;	/* Spawn file actions */
   int		mystdout[2] = {-1, -1},	/* Pipe for stdout */
 		mystderr[2] = {-1, -1};	/* Pipe for stderr */
@@ -88,7 +92,7 @@ serverTransformJob(
                 *endptr;		/* End of line */
   ssize_t	bytes;			/* Bytes read */
   size_t	total = 0;		/* Total bytes read */
-#endif /* !WIN32 */
+#endif /* !_WIN32 */
 
 
   if (command[0] != '/')
@@ -128,83 +132,81 @@ serverTransformJob(
   if (job->printer->pinfo.device_uri && asprintf(myenvp + myenvc, "DEVICE_URI=%s", job->printer->pinfo.device_uri) > 0)
     myenvc ++;
 
-  if ((attr = ippFindAttribute(job->attrs, "document-name", IPP_TAG_NAME)) != NULL && asprintf(myenvp + myenvc, "DOCUMENT_NAME=%s", ippGetString(attr, 0, NULL)) > 0)
-    myenvc ++;
-
-  /* TODO: OUTPUT_ORDER, defaults (Issue #94) */
-
   if (format && asprintf(myenvp + myenvc, "OUTPUT_TYPE=%s", format) > 0)
     myenvc ++;
 
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "materials-col-default", IPP_TAG_BEGIN_COLLECTION)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "materials-col-default", IPP_TAG_BEGIN_COLLECTION);
-  if (attr)
+  for (attr = ippFirstAttribute(job->printer->dev_attrs); attr && myenvc < (int)(sizeof(myenvp) / sizeof(myenvp[0]) - 1); attr = ippNextAttribute(job->printer->dev_attrs))
   {
-    ippAttributeString(attr, val, sizeof(val));
+   /*
+    * Convert "attribute-name-default" to "IPP_ATTRIBUTE_NAME_DEFAULT=" and
+    * "pwg-xxx" to "IPP_PWG_XXX=", then add the value(s) from the attribute.
+    */
 
-    if (asprintf(myenvp + myenvc, "PRINTER_MATERIALS_COL_DEFAULT=%s", val))
-      myenvc ++;
+    const char	*name = ippGetName(attr),
+					/* Attribute name */
+		*suffix = strstr(name, "-default");
+					/* Suffix on attribute name */
+
+    if (strncmp(name, "pwg-", 4) && (!suffix || suffix[8]))
+      continue;
+
+    valptr = val;
+    *valptr++ = 'I';
+    *valptr++ = 'P';
+    *valptr++ = 'P';
+    *valptr++ = '_';
+    while (*name && valptr < (val + sizeof(val) - 2))
+    {
+      if (*name == '-')
+	*valptr++ = '_';
+      else
+	*valptr++ = (char)toupper(*name & 255);
+
+      name ++;
+    }
+    *valptr++ = '=';
+    ippAttributeString(attr, valptr, sizeof(val) - (size_t)(valptr - val));
+
+    myenvp[myenvc++] = strdup(val);
   }
 
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "media-default", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "media-default", IPP_TAG_KEYWORD);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_MEDIA_DEFAULT=%s", ippGetString(attr, 0, NULL)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "media-col-default", IPP_TAG_BEGIN_COLLECTION)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "media-col-default", IPP_TAG_BEGIN_COLLECTION);
-  if (attr)
+  for (attr = ippFirstAttribute(job->printer->pinfo.attrs); attr && myenvc < (int)(sizeof(myenvp) / sizeof(myenvp[0]) - 1); attr = ippNextAttribute(job->printer->pinfo.attrs))
   {
-    ippAttributeString(attr, val, sizeof(val));
+   /*
+    * Convert "attribute-name-default" to "IPP_ATTRIBUTE_NAME_DEFAULT=" and
+    * "pwg-xxx" to "IPP_PWG_XXX=", then add the value(s) from the attribute.
+    */
 
-    if (asprintf(myenvp + myenvc, "PRINTER_MEDIA_COL_DEFAULT=%s", val))
-      myenvc ++;
+    const char	*name = ippGetName(attr),
+					/* Attribute name */
+		*suffix = strstr(name, "-default");
+					/* Suffix on attribute name */
+
+    if (strncmp(name, "pwg-", 4) && (!suffix || suffix[8]))
+      continue;
+
+    if (ippFindAttribute(job->printer->dev_attrs, name, IPP_TAG_ZERO))
+      continue;				/* Skip attributes we already have */
+
+    valptr = val;
+    *valptr++ = 'I';
+    *valptr++ = 'P';
+    *valptr++ = 'P';
+    *valptr++ = '_';
+    while (*name && valptr < (val + sizeof(val) - 2))
+    {
+      if (*name == '-')
+	*valptr++ = '_';
+      else
+	*valptr++ = (char)toupper(*name & 255);
+
+      name ++;
+    }
+    *valptr++ = '=';
+    ippAttributeString(attr, valptr, sizeof(val) - (size_t)(valptr - val));
+
+    myenvp[myenvc++] = strdup(val);
   }
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "platform-temperature-default", IPP_TAG_INTEGER)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "platform-temperature-default", IPP_TAG_INTEGER);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_PLATFORM_TEMPERATURE_DEFAULT=%d", ippGetInteger(attr, 0)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "print-base-default", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "print-base-default", IPP_TAG_KEYWORD);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_PRINT_BASE_DEFAULT=%s", ippGetString(attr, 0, NULL)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "print-quality-default", IPP_TAG_ENUM)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "print-quality-default", IPP_TAG_ENUM);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_PRINT_QUALITY_DEFAULT=%d", ippGetInteger(attr, 0)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "print-color-mode-default", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "print-color-mode-default", IPP_TAG_KEYWORD);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_PRINT_COLOR_MODE_DEFAULT=%s", ippGetString(attr, 0, NULL)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "print-supports-default", IPP_TAG_INTEGER)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "print-supports-default", IPP_TAG_INTEGER);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_PPRINT_SUPPORTS_DEFAULT=%s", ippGetString(attr, 0, NULL)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "sides-default", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "sides-default", IPP_TAG_KEYWORD);
-  if (attr && asprintf(myenvp + myenvc, "PRINTER_SIDES_DEFAULT=%s", ippGetString(attr, 0, NULL)))
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "pwg-raster-document-resolution-supported", IPP_TAG_RESOLUTION)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "pwg-raster-document-resolution-supported", IPP_TAG_RESOLUTION);
-  if (attr && ippAttributeString(attr, val, sizeof(val)) > 0 && asprintf(myenvp + myenvc, "PWG_RASTER_DOCUMENT_RESOLUTION_SUPPORTED=%s", val) > 0)
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "pwg-raster-document-sheet-back", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "pwg-raster-document-sheet-back", IPP_TAG_KEYWORD);
-  if (attr && asprintf(myenvp + myenvc, "PWG_RASTER_DOCUMENT_SHEET_BACK=%s", ippGetString(attr, 0, NULL)) > 0)
-    myenvc ++;
-
-  if ((attr = ippFindAttribute(job->printer->dev_attrs, "pwg-raster-document-type-supported", IPP_TAG_KEYWORD)) == NULL)
-    attr = ippFindAttribute(job->printer->pinfo.attrs, "pwg-raster-document-type-supported", IPP_TAG_KEYWORD);
-  if (attr && ippAttributeString(attr, val, sizeof(val)) > 0 && asprintf(myenvp + myenvc, "PWG_RASTER_DOCUMENT_TYPE_SUPPORTED=%s", val) > 0)
-    myenvc ++;
 
   if (LogLevel == SERVER_LOGLEVEL_INFO)
     myenvp[myenvc ++] = strdup("SERVER_LOGLEVEL=info");
@@ -212,6 +214,37 @@ serverTransformJob(
     myenvp[myenvc ++] = strdup("SERVER_LOGLEVEL=debug");
   else
     myenvp[myenvc ++] = strdup("SERVER_LOGLEVEL=error");
+
+  for (attr = ippFirstAttribute(job->doc_attrs); attr && myenvc < (int)(sizeof(myenvp) / sizeof(myenvp[0]) - 1); attr = ippNextAttribute(job->doc_attrs))
+  {
+   /*
+    * Convert "attribute-name" to "IPP_ATTRIBUTE_NAME=" and then add the
+    * value(s) from the attribute.
+    */
+
+    const char *name = ippGetName(attr);
+    if (!name)
+      continue;
+
+    valptr = val;
+    *valptr++ = 'I';
+    *valptr++ = 'P';
+    *valptr++ = 'P';
+    *valptr++ = '_';
+    while (*name && valptr < (val + sizeof(val) - 2))
+    {
+      if (*name == '-')
+        *valptr++ = '_';
+      else
+        *valptr++ = (char)toupper(*name & 255);
+
+      name ++;
+    }
+    *valptr++ = '=';
+    ippAttributeString(attr, valptr, sizeof(val) - (size_t)(valptr - val));
+
+    myenvp[myenvc++] = strdup(val);
+  }
 
   for (attr = ippFirstAttribute(job->attrs); attr && myenvc < (int)(sizeof(myenvp) / sizeof(myenvp[0]) - 1); attr = ippNextAttribute(job->attrs))
   {
@@ -222,6 +255,9 @@ serverTransformJob(
 
     const char *name = ippGetName(attr);
     if (!name)
+      continue;
+
+    if (ippFindAttribute(job->doc_attrs, name, IPP_TAG_ZERO))
       continue;
 
     valptr = val;
@@ -253,7 +289,7 @@ serverTransformJob(
   * Now run the program...
   */
 
-#ifdef WIN32
+#ifdef _WIN32
   status = _spawnvpe(_P_WAIT, command, myargv, myenvp);
 
 #else
@@ -272,10 +308,10 @@ serverTransformJob(
     if (mode == SERVER_TRANSFORM_TO_FILE)
     {
       serverCreateJobFilename(job, format, line, sizeof(line));
-      mystdout[1] = open(line, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0666);
+      mystdout[1] = open(line, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL | O_BINARY, 0666);
     }
     else
-      mystdout[1] = open("/dev/null", O_WRONLY);
+      mystdout[1] = open("/dev/null", O_WRONLY | O_BINARY);
 
     if (mystdout[1] < 0)
     {
@@ -291,14 +327,14 @@ serverTransformJob(
   }
 
   posix_spawn_file_actions_init(&actions);
-  posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+  posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY | O_BINARY, 0);
   if (mystdout[1] < 0)
-    posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0);
+    posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY | O_BINARY, 0);
   else
     posix_spawn_file_actions_adddup2(&actions, mystdout[1], 1);
 
   if (mystderr[1] < 0)
-    posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0);
+    posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY | O_BINARY, 0);
   else
     posix_spawn_file_actions_adddup2(&actions, mystderr[1], 2);
 
@@ -427,12 +463,12 @@ serverTransformJob(
 #  endif /* HAVE_WAITPID */
 
   job->transform_pid = 0;
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
   end = time_seconds();
   serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "Total transform time is %.3f seconds.", end - start);
 
-#ifdef WIN32
+#ifdef _WIN32
   if (status)
     serverLogJob(SERVER_LOGLEVEL_ERROR, job, "Transform command exited with status %d.", status);
 
@@ -444,7 +480,7 @@ serverTransformJob(
     else if (WIFSIGNALED(status) && WTERMSIG(status) != SIGTERM)
       serverLogJob(SERVER_LOGLEVEL_ERROR, job, "Transform command crashed on signal %d.", WTERMSIG(status));
   }
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
   return (status);
 
@@ -454,6 +490,7 @@ serverTransformJob(
 
   transform_failure:
 
+  #ifndef _WIN32
   if (mystdout[0] >= 0)
     close(mystdout[0]);
   if (mystdout[1] >= 0)
@@ -463,12 +500,42 @@ serverTransformJob(
     close(mystderr[0]);
   if (mystderr[1] >= 0)
     close(mystderr[1]);
+#endif /* !_WIN32 */
 
   while (myenvc > 0)
     free(myenvp[-- myenvc]);
 
   return (-1);
 }
+
+
+#ifdef _WIN32
+/*
+ * 'asprintf()' - Format and allocate a string.
+ */
+
+static int				/* O - Number of characters */
+asprintf(char       **s,		/* O - Allocated string or `NULL` on error */
+         const char *format,		/* I - printf-style format string */
+	 ...)				/* I - Additional arguments as needed */
+{
+  int		bytes;			/* Number of characters */
+  char		buffer[8192];		/* Temporary buffer */
+  va_list	ap;			/* Pointer to arguments */
+
+
+  va_start(ap, format);
+  bytes = vsnprintf(buffer, sizeof(buffer), format, ap);
+  va_end(ap);
+
+  if (bytes < 0)
+    *s = NULL;
+  else
+    *s = strdup(buffer);
+
+  return (bytes);
+}
+#endif /* _WIN32 */
 
 
 /*
@@ -593,8 +660,10 @@ process_state_message(
     char         *message)		/* I - Message */
 {
   int		i;			/* Looping var */
-  server_preason_t state_reasons,	/* printer-state-reasons values */
-		bit;			/* Current reason bit */
+  server_preason_t preasons,		/* printer-state-reasons values */
+		pbit;			/* Current printer reason bit */
+  server_jreason_t jreasons,		/* job-state-reasons values */
+		jbit;			/* Current job reason bit */
   char		*ptr,			/* Pointer into message */
 		*next;			/* Next keyword in message */
   int		remove;			/* Non-zero if we are removing keywords */
@@ -611,38 +680,52 @@ process_state_message(
  /*
   * Support the following forms of message:
   *
-  * "keyword[,keyword,...]" to set the printer-state-reasons value(s).
+  * "keyword[,keyword,...]" to set the job/printer-state-reasons value(s).
   *
   * "-keyword[,keyword,...]" to remove keywords.
   *
   * "+keyword[,keyword,...]" to add keywords.
   *
   * Keywords may or may not have a suffix (-report, -warning, -error) per
-  * RFC 2911.
+  * RFC 8011.
   */
 
   if (*message == '-')
   {
-    remove        = 1;
-    state_reasons = job->printer->state_reasons;
+    remove   = 1;
+    jreasons = job->state_reasons;
+    preasons = job->printer->state_reasons;
     message ++;
   }
   else if (*message == '+')
   {
-    remove        = 0;
-    state_reasons = job->printer->state_reasons;
+    remove   = 0;
+    jreasons = job->state_reasons;
+    preasons = job->printer->state_reasons;
     message ++;
   }
   else
   {
-    remove        = 0;
-    state_reasons = SERVER_PREASON_NONE;
+    remove   = 0;
+    jreasons = job->state_reasons;
+    preasons = SERVER_PREASON_NONE;
   }
 
   while (*message)
   {
     if ((next = strchr(message, ',')) != NULL)
       *next++ = '\0';
+
+    for (i = 0, jbit = 1; i < (int)(sizeof(server_jreasons) / sizeof(server_jreasons[0])); i ++, jbit *= 2)
+    {
+      if (!strcmp(message, server_jreasons[i]))
+      {
+        if (remove)
+	  jreasons &= ~jbit;
+	else
+	  jreasons |= jbit;
+      }
+    }
 
     if ((ptr = strstr(message, "-error")) != NULL)
       *ptr = '\0';
@@ -651,14 +734,14 @@ process_state_message(
     else if ((ptr = strstr(message, "-warning")) != NULL)
       *ptr = '\0';
 
-    for (i = 0, bit = 1; i < (int)(sizeof(server_preasons) / sizeof(server_preasons[0])); i ++, bit *= 2)
+    for (i = 0, pbit = 1; i < (int)(sizeof(server_preasons) / sizeof(server_preasons[0])); i ++, pbit *= 2)
     {
       if (!strcmp(message, server_preasons[i]))
       {
         if (remove)
-	  state_reasons &= ~bit;
+	  preasons &= ~pbit;
 	else
-	  state_reasons |= bit;
+	  preasons |= pbit;
       }
     }
 
@@ -668,7 +751,8 @@ process_state_message(
       break;
   }
 
-  job->printer->state_reasons = state_reasons;
+  job->state_reasons          = jreasons;
+  job->printer->state_reasons = preasons;
 }
 
 
@@ -679,7 +763,7 @@ process_state_message(
 static double				/* O - Time in seconds */
 time_seconds(void)
 {
-#ifdef WIN32
+#ifdef _WIN32
   struct _timeb curtime;		/* Current time */
 
 
@@ -694,5 +778,5 @@ time_seconds(void)
   gettimeofday(&curtime, NULL);
 
   return ((double)curtime.tv_sec + 0.000001 * curtime.tv_usec);
-#endif /* WIN32 */
+#endif /* _WIN32 */
 }

@@ -1,7 +1,7 @@
 /*
  * User-defined destination (and option) support for CUPS.
  *
- * Copyright © 2007-2018 by Apple Inc.
+ * Copyright © 2007-2019 by Apple Inc.
  * Copyright © 1997-2007 by Easy Software Products.
  *
  * Licensed under Apache License v2.0.  See the file "LICENSE" for more
@@ -13,6 +13,7 @@
  */
 
 #include "cups-private.h"
+#include "debug-internal.h"
 #include <sys/stat.h>
 
 #ifdef HAVE_NOTIFY_H
@@ -43,10 +44,10 @@
  */
 
 #ifdef __APPLE__
-#  if !TARGET_OS_IOS
+#  if HAVE_SCDYNAMICSTORECOPYCOMPUTERNAME
 #    include <SystemConfiguration/SystemConfiguration.h>
 #    define _CUPS_LOCATION_DEFAULTS 1
-#  endif /* !TARGET_OS_IOS */
+#  endif /* HAVE_SCDYNAMICSTORECOPYCOMPUTERNAME */
 #  define kCUPSPrintingPrefs	CFSTR("org.cups.PrintingPrefs")
 #  define kDefaultPaperIDKey	CFSTR("DefaultPaperID")
 #  define kLastUsedPrintersKey	CFSTR("LastUsedPrinters")
@@ -2031,9 +2032,9 @@ cupsSetDests2(http_t      *http,	/* I - Connection to server or @code CUPS_HTTP_
   cups_option_t	*option;		/* Current option */
   _ipp_option_t	*match;			/* Matching attribute for option */
   FILE		*fp;			/* File pointer */
-#ifndef WIN32
+#ifndef _WIN32
   const char	*home;			/* HOME environment variable */
-#endif /* WIN32 */
+#endif /* _WIN32 */
   char		filename[1024];		/* lpoptions file */
   int		num_temps;		/* Number of temporary destinations */
   cups_dest_t	*temps = NULL,		/* Temporary destinations */
@@ -2067,7 +2068,7 @@ cupsSetDests2(http_t      *http,	/* I - Connection to server or @code CUPS_HTTP_
 
   snprintf(filename, sizeof(filename), "%s/lpoptions", cg->cups_serverroot);
 
-#ifndef WIN32
+#ifndef _WIN32
   if (getuid())
   {
    /*
@@ -2087,7 +2088,7 @@ cupsSetDests2(http_t      *http,	/* I - Connection to server or @code CUPS_HTTP_
       snprintf(filename, sizeof(filename), "%s/.cups/lpoptions", home);
     }
   }
-#endif /* !WIN32 */
+#endif /* !_WIN32 */
 
  /*
   * Try to open the file...
@@ -2099,7 +2100,7 @@ cupsSetDests2(http_t      *http,	/* I - Connection to server or @code CUPS_HTTP_
     return (-1);
   }
 
-#ifndef WIN32
+#ifndef _WIN32
  /*
   * Set the permissions to 0644 when saving to the /etc/cups/lpoptions
   * file...
@@ -2107,7 +2108,7 @@ cupsSetDests2(http_t      *http,	/* I - Connection to server or @code CUPS_HTTP_
 
   if (!getuid())
     fchmod(fileno(fp), 0644);
-#endif /* !WIN32 */
+#endif /* !_WIN32 */
 
  /*
   * Write each printer; each line looks like:

@@ -1,5 +1,5 @@
 LIBRARY libcups2
-VERSION 2.12
+VERSION 2.14
 EXPORTS
 _cupsArrayAddStrings
 _cupsArrayNewStrings
@@ -13,8 +13,7 @@ _cupsConnect
 _cupsCreateDest
 _cupsEncodeOption
 _cupsEncodingName
-_cupsFileCheck
-_cupsFileCheckFilter
+_cupsFilePeekAhead
 _cupsGet1284Values
 _cupsGetDestResource
 _cupsGetDests
@@ -42,6 +41,15 @@ _cupsRWLockWrite
 _cupsRWUnlock
 _cupsRasterAddError
 _cupsRasterClearError
+_cupsRasterColorSpaceString
+_cupsRasterDelete
+_cupsRasterErrorString
+_cupsRasterInitPWGHeader
+_cupsRasterNew
+_cupsRasterReadHeader
+_cupsRasterReadPixels
+_cupsRasterWriteHeader
+_cupsRasterWritePixels
 _cupsSetDefaults
 _cupsSetError
 _cupsSetHTTPError
@@ -59,13 +67,16 @@ _cupsThreadCreate
 _cupsThreadDetach
 _cupsThreadWait
 _cupsUserDefault
+_cups_gettimeofday
 _cups_safe_vsnprintf
+_cups_snprintf
 _cups_strcasecmp
 _cups_strcpy
 _cups_strcpy
 _cups_strlcat
 _cups_strlcpy
 _cups_strncasecmp
+_cups_vsnprintf
 _httpAddrSetPort
 _httpCreateCredentials
 _httpDecodeURI
@@ -73,6 +84,7 @@ _httpDisconnect
 _httpEncodeURI
 _httpFreeCredentials
 _httpResolveURI
+_httpSetDigestAuthString
 _httpStatus
 _httpTLSInitialize
 _httpTLSPending
@@ -267,7 +279,6 @@ cupsUTF8ToUTF32
 cupsUser
 cupsUserAgent
 cupsWriteRequestData
-hex_dump
 httpAcceptConnection
 httpAddCredential
 httpAddrAny
@@ -474,22 +485,9 @@ ippValidateAttributes
 ippWrite
 ippWriteFile
 ippWriteIO
-main
-main
-main
-main
-main
-main
-main
-main
-main
-print_attributes
 pwgFormatSizeName
 pwgInitSize
 pwgMediaForLegacy
 pwgMediaForPPD
 pwgMediaForPWG
 pwgMediaForSize
-read_cb
-token_cb
-write_cb

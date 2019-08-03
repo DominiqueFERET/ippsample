@@ -1,7 +1,7 @@
 /*
  * Hashing function for CUPS.
  *
- * Copyright © 2015-2018 by Apple Inc.
+ * Copyright © 2015-2019 by Apple Inc.
  *
  * Licensed under Apache License v2.0.  See the file "LICENSE" for more
  * information.
@@ -17,7 +17,7 @@
 #elif defined(HAVE_GNUTLS)
 #  include <gnutls/crypto.h>
 #else
-#  include "md5-private.h"
+#  include "md5-internal.h"
 #endif /* __APPLE__ */
 
 
@@ -230,7 +230,7 @@ cupsHashData(const char    *algorithm,	/* I - Algorithm name */
 
     gnutls_hash_fast(alg, data, datalen, hash);
 
-    return (gnutls_hash_get_len(alg));
+    return ((ssize_t)gnutls_hash_get_len(alg));
   }
 
 #else

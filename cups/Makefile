@@ -33,7 +33,6 @@ LIBOBJS	=	\
 		dest-options.o \
 		dir.o \
 		encode.o \
-		error.o \
 		file.o \
 		getputfile.o \
 		globals.o \
@@ -53,7 +52,9 @@ LIBOBJS	=	\
 		notify.o \
 		options.o \
 		pwg-media.o \
-		raster.o \
+		raster-error.o \
+		raster-stream.o \
+		raster-stubs.o \
 		request.o \
 		snprintf.o \
 		string.o \
@@ -133,6 +134,10 @@ install:	all
 	for file in $(HEADERS); do \
 		$(INSTALL_DATA) $$file $(BUILDROOT)$(includedir)/cups; \
 	done
+	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(datadir)/cups
+	for file in cupspm.epub cupspm.html cupspm.png; do \
+		$(INSTALL_DATA) $$file $(BUILDROOT)$(datadir)/cups; \
+	done
 
 
 #
@@ -166,12 +171,13 @@ libcups.a:	$(LIBOBJS)
 libcups2.def: $(OBJS) Makefile
 	echo Generating $@...
 	echo "LIBRARY libcups2" >libcups2.def
-	echo "VERSION 2.12" >>libcups2.def
+	echo "VERSION 2.14" >>libcups2.def
 	echo "EXPORTS" >>libcups2.def
-	(nm $(OBJS) 2>/dev/null | grep "T _" | awk '{print $$3}'; \
-	 echo __cups_strcpy; echo __cups_strlcat; echo __cups_strlcpy) | \
+	(nm $(LIBOBJS) 2>/dev/null | grep "T _" | awk '{print $$3}'; \
+	 echo __cups_strcpy; echo __cups_strlcat; echo __cups_strlcpy; \
+	 echo __cups_snprintf; echo __cups_vsnprintf; echo __cups_gettimeofday) | \
 		grep -v -E \
-		    -e 'cups_debug|Apple|GSSService|SetNegotiate' \
+		    -e 'cups_debug|Apple|FileCheck|GSSService|SetNegotiate' \
 		    -e 'Block$$' | \
 		sed -e '1,$$s/^_//' | sort >>libcups2.def
 
@@ -213,69 +219,20 @@ testraster: testraster.o
 # Automatic API help files...
 #
 
-APISOURCES =	\
-		auth.c \
-		cups.h \
-		dest.c \
-		dest-job.c \
-		dest-localization.c \
-		dest-options.c \
-		encode.c \
-		error.c \
-		getputfile.c \
-		hash.c \
-		http.c \
-		http.h \
-		http-addr.c \
-		http-addrlist.c \
-		http-support.c \
-		ipp.c \
-		ipp.h \
-		ipp-support.c \
-		md5passwd.c \
-		notify.c \
-		options.c \
-		pwg.h \
-		pwg-media.c \
-		raster.c \
-		raster.h \
-		request.c \
-		tls.c \
-		usersys.c \
-		util.c
+APISOURCES =	$(LIBOBJS:.o=.c) $(HEADERS)
 
 apihelp:
 	echo Generating CUPS API help files...
-	mxmldoc --title "CUPS API Programming Guide" \
-		--author "Michael R Sweet" \
-		--copyright "Copyright 2007-2017 by Apple Inc." \
-		--docversion $(IPPSAMPLE_VERSION) \
-		--intro api.intro \
-		api.xml $(APISOURCES) >../doc/api.html
-	mxmldoc --title "CUPS API Programming Guide" \
-		--author "Michael R Sweet" \
-		--copyright "Copyright 2007-2017 by Apple Inc." \
-		--docversion $(IPPSAMPLE_VERSION) \
-		--intro api.intro \
-		--epub ../doc/api.epub \
-		api.xml
-	if test `uname` = Darwin; then \
-		mxmldoc --title "CUPS API Programming Guide" \
-			--author "Michael R Sweet" \
-			--copyright "Copyright 2007-2017 by Apple Inc." \
-			--docversion $(IPPSAMPLE_VERSION) \
-			--intro api.intro \
-			--docset org.pwg.ippsample.docset \
-			--feedname org.pwg.ippsample \
-			--feedurl https://istopwg.github.io/ippsample/org.pwg.ippsample.atom \
-			api.xml; \
-		$(RM) org.pwg.ippsample.atom; \
-		xcrun docsetutil package --output org.pwg.ippsample.xar \
-			--atom org.pwg.ippsample.atom \
-			--download-url https://istopwg.github.io/ippsample/org.pwg.ippsample.xar \
-			org.pwg.ippsample.docset || exit 1; \
-	fi
-	$(RM) api.xml
+	$(RM) cupspm.xml
+	codedoc --section "Programming" --body cupspm.md \
+		cupspm.xml \
+		auth.c cups.h dest*.c encode.c http.h http*.c ipp.h ipp*.c \
+		options.c tls-darwin.c usersys.c util.c \
+		--coverimage cupspm.png \
+		--epub cupspm.epub
+	codedoc --section "Programming" --body cupspm.md \
+		cupspm.xml > cupspm.html
+	$(RM) cupspm.xml
 
 
 #
