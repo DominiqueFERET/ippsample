@@ -1,17 +1,16 @@
 .\"
-.\" ippeveprinter man page for CUPS.
+.\" ipp3dprinter man page.
 .\"
-.\" Copyright © 2020 by the IEEE-ISTO Printer Working Group.
 .\" Copyright © 2014-2019 by Apple Inc.
 .\"
 .\" Licensed under Apache License v2.0.  See the file "LICENSE" for more
 .\" information.
 .\"
-.TH ippeveprinter 1 "CUPS" "6 March 2020" "Apple Inc."
+.TH ipp3dprinter 1 "CUPS" "26 September 2019" "Apple Inc."
 .SH NAME
-ippeveprinter \- an ipp everywhere printer application for cups
+ipp3dprinter \- an ipp 3d printer application
 .SH SYNOPSIS
-.B ippeveprinter
+.B ipp3dprinter
 [
 .B \-\-help
 ] [
@@ -19,28 +18,14 @@ ippeveprinter \- an ipp everywhere printer application for cups
 ] [
 .B \-\-version
 ] [
-.B \-2
-] [
 .B \-D
 .I device-uri
-] [
-.B \-F
-.I output-type/subtype
 ] [
 .B \-K
 .I keypath
 ] [
 .B \-M
 .I manufacturer
-] [
-.B \-P
-.I filename.ppd
-] [
-.B \-S
-.I filename.strings
-] [
-.B \-V
-.I ipp-version
 ] [
 .B \-a
 .I filename.conf
@@ -55,7 +40,7 @@ ippeveprinter \- an ipp everywhere printer application for cups
 .I type/subtype[,...]
 ] [
 .B \-i
-.I iconfile.png[,...]
+.I iconfile.png
 ] [
 .B \-k
 ] [
@@ -74,18 +59,16 @@ ippeveprinter \- an ipp everywhere printer application for cups
 .B \-r
 .I subtype[,subtype]
 ] [
-.B \-s
-.I speed[,color-speed]
-] [
 .B \-v[vvv]
 ]
 .I service-name
 .SH DESCRIPTION
-.B ippeveprinter
-is a simple Internet Printing Protocol (IPP) server conforming to the IPP Everywhere (PWG 5100.14) specification. It can be used to test client software or act as a very basic print server that runs a command for every job that is printed.
+.B ipp3dprinter
+is a simple Internet Printing Protocol (IPP) server conforming to the IPP 3D Printing Extensions (PWG 5100.21) specification.
+It can be used to test client software or act as a very basic print server that runs a command for every job that is printed.
 .SH OPTIONS
 The following options are recognized by
-.B ippeveprinter:
+.B ipp3dprinter:
 .TP 5
 .B \-\-help
 Show program usage.
@@ -96,45 +79,21 @@ Disable the web interface forms used to update the media and supply levels.
 .B \-\-version
 Show the CUPS version.
 .TP 5
-.B \-2
-Report support for two-sided (duplex) printing.
-.TP 5
 \fB\-D \fIdevice-uri\fR
 Set the device URI for print output.
 The URI can be a filename, directory, or a network socket URI of the form "socket://ADDRESS[:PORT]" (where the default port number is 9100).
 When specifying a directory,
-.B ippeveprinter
+.B ipp3dprinter
 will create an output file using the job ID and name.
-.TP 5
-\fB\-F \fIoutput-type/subtype[,...]\fR
-Specifies the output MIME media type.
-The default is "application/postscript" when the \fB\-P\fR option is specified.
 .TP 5
 \fB\-M \fImanufacturer\fR
 Set the manufacturer of the printer.
 The default is "Example".
 .TP 5
-\fB\-P \fIfilename.ppd\fR
-Load printer attributes from the specified PPD file.
-This option is typically used in conjunction with the
-.BR ippeveps (7)
-printer command ("\-c ippeveps").
-.TP 5
-\fB\-S \fIfilename.strings\fR
-Specifies the message strings file for the server.
-The file must be an "text/strings" file as defined in PWG 5100.14.
-The default is no strings file.
-.TP 5
-\fB\-V 1.1\fR
-.TP 5
-\fB\-V 2.0\fR
-Specifies the maximum IPP version to report.
-2.0 is the default.
-.TP 5
 \fB\-c \fIcommand\fR
 Run the specified command for each document that is printed.
 If "command" is not an absolute path ("/path/to/command"),
-.B ippeveprinter
+.B ipp3dprinter
 looks for the command in the "command" subdirectory of the CUPS binary directory, typically /usr/lib/cups/command or /usr/libexec/cups/command.
 The
 .BR cups-config (1)
@@ -151,11 +110,10 @@ The default is a directory under the user's current temporary directory.
 Specifies a list of MIME media types that the server will accept.
 The default depends on the type of printer created.
 .TP 5
-\fB\-i \fIiconfile.png[,...]\fR
-Specifies the printer icon file(s) for the server.
-Each file must be a PNG format image.
-The standard dimensions for printer icons are 48x48, 128x128, and 512x512 pixels.
-The defaults are internally-provided PNG images at each of the standard sizes.
+\fB\-i \fIiconfile.png\fR
+Specifies the printer icon file for the server.
+The file must be a PNG format image.
+The default is an internally-provided PNG image.
 .TP 5
 .B \-k
 Keeps the print documents in the spool directory rather than deleting them.
@@ -183,47 +141,42 @@ Specifies the DNS-SD subtype(s) to advertise.
 Separate multiple subtypes with a comma.
 The default is "_print".
 .TP 5
-\fB\-s \fIspeed[,color-speed]\fR
-Specifies the printer speed in pages per minute.
-If two numbers are specified and the second number is greater than zero, the server will report support for color printing.
-The default is "10,0".
-.TP 5
 .B \-v[vvv]
 Be (very) verbose when logging activity to standard error.
 .SH EXIT STATUS
 The
-.B ippeveprinter
+.B ipp3dprinter
 program returns 1 if it is unable to process the command-line arguments or register the IPP service.
 Otherwise
-.B ippeveprinter
+.B ipp3dprinter
 will run continuously until terminated.
 .SH CONFORMING TO
 The
-.B ippeveprinter
-program is unique to CUPS and conforms to the IPP Everywhere (PWG 5100.14) specification.
+.B ipp3dprinter
+program is unique to CUPS and conforms to the IPP 3D Printing Extensions (PWG 5100.21) specification.
 .SH ENVIRONMENT
-.B ippeveprinter
+.B ipp3dprinter
 adds environment variables starting with "IPP_" for all IPP Job attributes in the print request.
-For example, when executing a command for an IPP Job containing the "media" Job Template attribute, the "IPP_MEDIA" environment variable will be set to the value of that attribute.
+For example, when executing a command for an IPP Job containing the "materials-col" Job Template attribute, the "IPP_MATERIALS_COL" environment variable will be set to the value of that attribute.
 .LP
 In addition, all IPP "xxx-default" and "pwg-xxx" Printer Description attributes are added to the environment.
-For example, the "IPP_MEDIA_DEFAULT" environment variable will be set to the default value for the "media" Job Template attribute.
+For example, the "IPP_MATERIALS_COL_DEFAULT" environment variable will be set to the default value for the "materials-col" Job Template attribute.
 .LP
 Enumerated values are converted to their keyword equivalents.
 For example, a "print-quality" Job Template attribute with a enum value of 3 will become the "IPP_PRINT_QUALITY" environment variable with a value of "draft".
-This string conversion only happens for standard Job Template attributes, currently "finishings", "orientation-requested", and "print-quality".
+This string conversion only happens for standard Job Template attributes, currently "finishings" and "print-quality".
 .LP
-Finally, the "CONTENT_TYPE" environment variable contains the MIME media type of the document being printed, the "DEVICE_URI" environment variable contains the device URI as specified with the "\-D" option, the "OUTPUT_FORMAT" environment variable contains the output MIME media type, and the "PPD" environment variable contains the PPD filename as specified with the "\-P" option.
+Finally, the "CONTENT_TYPE" environment variable contains the MIME media type of the document being printed and the "DEVICE_URI" environment variable contains the device URI as specified with the "\-D" option.
 .SH COMMAND OUTPUT
 Unless they communicate directly with a printer, print commands send printer-ready data to the standard output.
 .LP
 Print commands can send messages back to
-.B ippeveprinter
+.B ipp3dprinter
 on the standard error with one of the following prefixes:
 .TP 5
 \fBATTR: \fIattribute=value[ attribute=value]\fR
 Sets the named attribute(s) to the given values.
-Currently only the "job-impressions" and "job-impressions-completed" Job Status attributes and the "marker-xxx", "printer-alert", "printer-alert-description", "printer-supply", and "printer-supply-description" Printer Status attributes can be set.
+Currently only the "printer-alert" and "printer-alert-description" Printer Status attributes can be set.
 .TP 5
 \fBDEBUG: \fIDebugging message\fR
 Logs a debugging message if at least two \-v's have been specified.
@@ -244,11 +197,11 @@ Removes the listed keywords from the printer's "printer-state-reasons" attribute
 Adds the listed keywords to the printer's "printer-state-reasons" attribute.
 .SH EXAMPLES
 Run
-.B ippeveprinter
+.B ipp3dprinter
 with a service name of My Cool Printer:
 .nf
 
-    ippeveprinter "My Cool Printer"
+    ipp3dprinter "My Cool Printer"
 .fi
 .LP
 Run the
@@ -256,12 +209,9 @@ Run the
 command whenever a job is sent to the server:
 .nf
 
-    ippeveprinter \-c /usr/bin/file "My Cool Printer"
+    ipp3dprinter \-c /usr/bin/file "My Cool Printer"
 .fi
 .SH SEE ALSO
-.BR ippevepcl (7),
-.BR ippeveps (7),
 PWG Internet Printing Protocol Workgroup (http://www.pwg.org/ipp)
 .SH COPYRIGHT
-Copyright \[co] 2020 by the IEEE-ISTO Printer Working Group.
 Copyright \[co] 2007-2019 by Apple Inc.

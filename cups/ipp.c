@@ -3040,8 +3040,13 @@ ippReadIO(void       *src,		/* I - Data source */
 
           DEBUG_printf(("2ippReadIO: name length=%d", n));
 
-          if (n == 0 && tag != IPP_TAG_MEMBERNAME &&
-	      tag != IPP_TAG_END_COLLECTION)
+          if (n && parent)
+          {
+            _cupsSetError(IPP_STATUS_ERROR_INTERNAL, _("Invalid named IPP attribute in collection."), 1);
+            DEBUG_puts("1ippReadIO: bad attribute name in collection.");
+            return (IPP_STATE_ERROR);
+          }
+          else if (n == 0 && tag != IPP_TAG_MEMBERNAME && tag != IPP_TAG_END_COLLECTION)
 	  {
 	   /*
 	    * More values for current attribute...
@@ -4545,9 +4550,7 @@ ippSetValueTag(
         break;
 
     case IPP_TAG_NAME :
-        if (temp_tag != IPP_TAG_KEYWORD && temp_tag != IPP_TAG_URI &&
-            temp_tag != IPP_TAG_URISCHEME && temp_tag != IPP_TAG_LANGUAGE &&
-            temp_tag != IPP_TAG_MIMETYPE)
+        if (temp_tag != IPP_TAG_KEYWORD)
           return (0);
 
         (*attr)->value_tag = (ipp_tag_t)(IPP_TAG_NAME | ((*attr)->value_tag & IPP_TAG_CUPS_CONST));
@@ -4555,17 +4558,14 @@ ippSetValueTag(
 
     case IPP_TAG_NAMELANG :
     case IPP_TAG_TEXTLANG :
-        if (value_tag == IPP_TAG_NAMELANG &&
-            (temp_tag != IPP_TAG_NAME && temp_tag != IPP_TAG_KEYWORD &&
-             temp_tag != IPP_TAG_URI && temp_tag != IPP_TAG_URISCHEME &&
-             temp_tag != IPP_TAG_LANGUAGE && temp_tag != IPP_TAG_MIMETYPE))
+        if (value_tag == IPP_TAG_NAMELANG && (temp_tag != IPP_TAG_NAME && temp_tag != IPP_TAG_KEYWORD))
           return (0);
 
         if (value_tag == IPP_TAG_TEXTLANG && temp_tag != IPP_TAG_TEXT)
           return (0);
 
         if (ipp->attrs && ipp->attrs->next && ipp->attrs->next->name &&
-            !strcmp(ipp->attrs->next->name, "attributes-natural-language"))
+            !strcmp(ipp->attrs->next->name, "attributes-natural-language") && (ipp->attrs->next->value_tag & IPP_TAG_CUPS_MASK) == IPP_TAG_LANGUAGE)
         {
          /*
           * Use the language code from the IPP message...
@@ -4659,7 +4659,7 @@ ippSetVersion(ipp_t *ipp,		/* I - IPP message */
 const ipp_uchar_t *			/* O - RFC-2579 date/time data */
 ippTimeToDate(time_t t)			/* I - Time in seconds */
 {
-  struct tm	*unixdate;		/* UNIX unixdate/time info */
+  struct tm	unixdate;		/* UNIX unixdate/time info */
   ipp_uchar_t	*date = _cupsGlobals()->ipp_date;
 					/* RFC-2579 date/time data */
 
@@ -4681,16 +4681,16 @@ ippTimeToDate(time_t t)			/* I - Time in seconds */
   *    10       UTC minutes (0 to 59)
   */
 
-  unixdate = gmtime(&t);
-  unixdate->tm_year += 1900;
+  gmtime_r(&t, &unixdate);
+  unixdate.tm_year += 1900;
 
-  date[0]  = (ipp_uchar_t)(unixdate->tm_year >> 8);
-  date[1]  = (ipp_uchar_t)(unixdate->tm_year);
-  date[2]  = (ipp_uchar_t)(unixdate->tm_mon + 1);
-  date[3]  = (ipp_uchar_t)unixdate->tm_mday;
-  date[4]  = (ipp_uchar_t)unixdate->tm_hour;
-  date[5]  = (ipp_uchar_t)unixdate->tm_min;
-  date[6]  = (ipp_uchar_t)unixdate->tm_sec;
+  date[0]  = (ipp_uchar_t)(unixdate.tm_year >> 8);
+  date[1]  = (ipp_uchar_t)(unixdate.tm_year);
+  date[2]  = (ipp_uchar_t)(unixdate.tm_mon + 1);
+  date[3]  = (ipp_uchar_t)unixdate.tm_mday;
+  date[4]  = (ipp_uchar_t)unixdate.tm_hour;
+  date[5]  = (ipp_uchar_t)unixdate.tm_min;
+  date[6]  = (ipp_uchar_t)unixdate.tm_sec;
   date[7]  = 0;
   date[8]  = '+';
   date[9]  = 0;

@@ -623,7 +623,7 @@ copy_doc_attributes(
     ippAddInteger(client->response, IPP_TAG_DOCUMENT, IPP_TAG_INTEGER, "document-number", 1);
 
   if (check_attribute("document-state", ra, pa))
-    ippAddInteger(client->response, IPP_TAG_DOCUMENT, IPP_TAG_ENUM, "document-state", job->state);
+    ippAddInteger(client->response, IPP_TAG_DOCUMENT, IPP_TAG_ENUM, "document-state", (int)job->state);
 
   if (check_attribute("document-state-reasons", ra, pa))
     serverCopyJobStateReasons(client->response, IPP_TAG_DOCUMENT, job);
@@ -975,7 +975,7 @@ copy_job_attributes(
     ippAddInteger(client->response, IPP_TAG_JOB, IPP_TAG_INTEGER, "job-printer-up-time", (int)(time(NULL) - client->printer->start_time));
 
   if (check_attribute("job-state", ra, pa))
-    ippAddInteger(client->response, IPP_TAG_JOB, IPP_TAG_ENUM, "job-state", job->state);
+    ippAddInteger(client->response, IPP_TAG_JOB, IPP_TAG_ENUM, "job-state", (int)job->state);
 
   if (check_attribute("job-state-message", ra, pa))
   {
@@ -1187,7 +1187,7 @@ copy_resource_attributes(
   /* resource-state */
   if (!ra || cupsArrayFind(ra, "resource-state"))
   {
-    ippAddInteger(client->response, IPP_TAG_RESOURCE, IPP_TAG_ENUM, "resource-state", resource->state);
+    ippAddInteger(client->response, IPP_TAG_RESOURCE, IPP_TAG_ENUM, "resource-state", (int)resource->state);
   }
 
   /* resource-state-reasons */
@@ -1265,7 +1265,7 @@ copy_system_state(ipp_t        *ipp,	/* I - IPP message */
   }
 
   if (!ra || cupsArrayFind(ra, "system-state"))
-    ippAddInteger(ipp, IPP_TAG_SYSTEM, IPP_TAG_ENUM, "system-state", state);
+    ippAddInteger(ipp, IPP_TAG_SYSTEM, IPP_TAG_ENUM, "system-state", (int)state);
 
   if (!ra || cupsArrayFind(ra, "system-state-change-date-time"))
     ippAddDate(ipp, IPP_TAG_SYSTEM, "system-state-change-date-time", ippTimeToDate(state_time));
@@ -3284,23 +3284,6 @@ ipp_delete_printer(
 
   client->printer->is_deleted = 1;
 
-  if (client->printer->processing_job)
-  {
-    client->printer->state_reasons |= SERVER_PREASON_MOVING_TO_PAUSED | SERVER_PREASON_DELETING;
-    serverStopJob(client->printer->processing_job);
-
-    serverAddEventNoLock(client->printer, NULL, NULL, SERVER_EVENT_PRINTER_STATE_CHANGED, "Printer being deleted.");
-  }
-  else
-  {
-    client->printer->state         = IPP_PSTATE_STOPPED;
-    client->printer->state_reasons |= SERVER_PREASON_DELETING;
-
-    serverAddEventNoLock(client->printer, NULL, NULL, SERVER_EVENT_PRINTER_DELETED, "Printer deleted.");
-
-    serverDeletePrinter(client->printer);
-  }
-
  /*
   * Abort all jobs for this printer...
   */
@@ -3335,6 +3318,27 @@ ipp_delete_printer(
   }
 
   _cupsRWUnlock(&SubscriptionsRWLock);
+
+  if (client->printer->processing_job)
+  {
+   /*
+    * Printer is processing a job, delete immediately...
+    */
+
+    client->printer->state_reasons |= SERVER_PREASON_MOVING_TO_PAUSED | SERVER_PREASON_DELETING;
+    serverStopJob(client->printer->processing_job);
+
+    serverAddEventNoLock(client->printer, NULL, NULL, SERVER_EVENT_PRINTER_STATE_CHANGED, "Printer being deleted.");
+  }
+  else
+  {
+    client->printer->state         = IPP_PSTATE_STOPPED;
+    client->printer->state_reasons |= SERVER_PREASON_DELETING;
+
+    serverAddEventNoLock(client->printer, NULL, NULL, SERVER_EVENT_PRINTER_DELETED, "Printer deleted.");
+
+    serverDeletePrinter(client->printer);
+  }
 
   serverRespondIPP(client, IPP_STATUS_OK, NULL);
 
@@ -4013,7 +4017,7 @@ ipp_get_jobs(server_client_t *client)	/* I - Client */
   }
   else if (!strcmp(which_jobs, "fetchable") && client->printer->pinfo.proxy_group != SERVER_GROUP_NONE)
   {
-    job_comparison = 0;
+    job_comparison = -1;
     job_state      = IPP_JSTATE_STOPPED;
     job_reasons    = SERVER_JREASON_JOB_FETCHABLE;
   }
@@ -4534,7 +4538,7 @@ ipp_get_printers(
     */
 
     i ++;
-    if (first_index > 0 && i < first_index)
+    if (i < first_index)
       continue;
 
     if (count)
@@ -4745,7 +4749,7 @@ ipp_get_resources(
 
     if ((!resource_formats || ippContainsString(resource_formats, resource->format)) &&
         (!resource_ids || ippContainsInteger(resource_ids, resource->id)) &&
-        (!resource_states || ippContainsInteger(resource_states, resource->state)) &&
+        (!resource_states || ippContainsInteger(resource_states, (int)resource->state)) &&
         (!resource_types || ippContainsString(resource_types, resource->type)))
     {
       idx ++;
@@ -4987,7 +4991,7 @@ ipp_get_system_attributes(
         ippAddBoolean(col, IPP_TAG_ZERO, "printer-is-accepting-jobs", (char)ippGetBoolean(ippFindAttribute(printer->pinfo.attrs, "printer-is-accepting-jobs", IPP_TAG_BOOLEAN), 0));
         ippAddString(col, IPP_TAG_ZERO, IPP_TAG_NAME, "printer-name", NULL, printer->name);
         ippAddString(col, IPP_TAG_ZERO, IPP_CONST_TAG(IPP_TAG_KEYWORD), "printer-service-type", NULL, types[printer->type]);
-        ippAddInteger(col, IPP_TAG_ZERO, IPP_TAG_ENUM, "printer-state", printer->state);
+        ippAddInteger(col, IPP_TAG_ZERO, IPP_TAG_ENUM, "printer-state", (int)printer->state);
         serverCopyPrinterStateReasons(col, IPP_TAG_ZERO, printer);
         ippCopyAttribute(col, ippFindAttribute(printer->pinfo.attrs, "printer-xri-supported", IPP_TAG_BEGIN_COLLECTION), 1);
 
